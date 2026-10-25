@@ -3,7 +3,7 @@
  * Edit the text here, then run `node build.js` to regenerate the HTML pages.
  */
 
-// Contact details, links and form settings (replaces the WordPress Customizer).
+// Contact details, links and form settings.
 const config = {
 	siteUrl: '', // e.g. 'https://mursidigital.com' — used for schema URLs; leave empty until you have a domain.
 	email: 'mursidigital.agency@gmail.com',

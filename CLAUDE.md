@@ -4,45 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A custom **classic (PHP) WordPress theme** for Mursi Digital Solutions, an agency selling AI Automation, Web Design & Development (UX/UI + WordPress), and Local SEO. The theme lives in `mursi-digital/`; the repo root holds only docs. Site copy is English. No build step, no Composer/npm, no jQuery, no page-builder dependency.
+A **static website** (plain HTML, CSS, vanilla JavaScript) for Mursi Digital Solutions, an agency selling AI Automation, Web Design & Development (UX/UI + WordPress), and Local SEO. The site lives in `static-site/`; the repo root holds only docs. Site copy is English. No framework, no npm dependencies, no jQuery, no server-side code. (The site *sells* WordPress development; the site itself is not WordPress.)
 
 ## Commands
 
-There is no build, lint or test tooling in the repo, and PHP is not installed on the dev machine, so PHP cannot be linted or run locally.
+There is no lint or test tooling. Node is the only requirement.
 
-- JS syntax check: `node --check mursi-digital/assets/js/main.js`
-- Package for install: zip the `mursi-digital` folder itself (the zip must contain the folder), then WP Admin → Appearance → Themes → Upload.
-- Real testing happens on a WordPress install (LocalWP or staging). See `README.md` for the required page slugs/templates and Customizer setup.
+- Regenerate pages: `node static-site/build.js` (run after any change to `data.js` or `build.js`)
+- JS syntax check: `node --check static-site/assets/js/main.js`
+- Preview: open `static-site/index.html` in a browser. Pages use relative links, so they work from `file://`.
 
 ## Architecture
 
-**Content is data, not templates.** All marketing copy (services, pricing, FAQs, testimonials, process steps, "why us") is returned by functions in `inc/data.php` (`mursi_services()`, `mursi_pricing()`, `mursi_home_faqs()`, etc.). Templates loop over these arrays. To change site text or prices, edit `inc/data.php`, not the templates. `mursi_services()` is filterable via `mursi_services`.
+**Content is data, pages are generated.** All copy, prices, FAQs, testimonials, projects and settings live in `static-site/data.js` (CommonJS). `static-site/build.js` turns it into the `.html` files. Never edit the generated `.html` files by hand; change `data.js` (content) or `build.js` (markup) and rebuild. Commit the regenerated HTML together with the source change.
 
 **Service slugs are the join key.** The three service slugs `ai-automation`, `web-design-development`, `local-seo` link together:
-- keys of `mursi_services()` and `mursi_pricing()`
-- the WordPress page slug that `page-templates/template-service.php` reads (`post_name`) to pick which service to render
-- `project_type` taxonomy term slugs (auto-created on `after_switch_theme` in `inc/post-types.php`), used for the portfolio filter and related projects
-- the `?service=` query arg that preselects the contact form dropdown
+- keys of `services` and `pricing` in `data.js`
+- the generated page file name (`<slug>.html`)
+- the `types` of entries in `projects`, used for the portfolio filter and the "Recent Work" section on service pages
+- the `?service=` query arg that preselects the contact form dropdown (matched against `data-slug` on the `<option>`)
 
 Renaming a slug means changing all of these together.
 
-**Page URLs resolve by slug.** `mursi_page_url( 'contact' )` (in `inc/helpers.php`) looks up a page by path and falls back to `home_url('/contact/')`, so templates link to `about`, `portfolio`, `pricing`, `contact` and the service slugs without hard-coded IDs.
+**`build.js` structure.** Helpers (`esc`, `pageUrl`, `bookingUrl`, `whatsappUrl`, `icon`), then `layout()` (head, header, footer, JSON-LD), then section functions mirroring reusable blocks (`pageHero`, `servicesGrid`, `faqSection`, `pricingTable`, `cta`, …) that take an options object with defaults, then one function per page. Add a page by writing a page function and registering it in the `pages` map at the bottom.
 
-**Template parts take args.** Pages are composed from `template-parts/*` via `mursi_part( $name, $args )` (wraps `get_template_part` with `$args`, WP 5.5+). Each part calls `wp_parse_args` on `$args` for its defaults.
+**Settings.** `config` in `data.js` holds email, phone, WhatsApp, booking URL, map embed, form endpoint, site URL and social links. WhatsApp buttons only render when `config.whatsapp` is set. `bookingUrl()` falls back to `contact.html`. Brand color is the `--brand*` CSS variables in `style.css`.
 
-**Options come from the Customizer.** `mursi_option( $key )` reads `mursi_<key>` theme mods with defaults from `mursi_option_defaults()` in `inc/customizer.php` (email, phone, WhatsApp, city, hours, booking URL, map embed, social links, brand color). The floating WhatsApp button and WhatsApp CTAs only render when a WhatsApp number is set. `mursi_booking_url()` falls back to the Contact page. A non-default brand color is injected as CSS variable overrides (`--brand`, `--brand-dark`, `--brand-soft`) in `wp_head`.
+**Schema.** The home page gets `ProfessionalService` JSON-LD. Pages pass their rendered FAQs to `layout({ faqs })`, which prints one combined `FAQPage` block. Absolute URLs (canonical, schema `url`) are only emitted when `config.siteUrl` is set.
 
-**Schema.** `inc/schema.php` prints `ProfessionalService` JSON-LD on the front page. Every rendered `template-parts/faq.php` registers its Q&As via `mursi_faq_registry()`, and one combined `FAQPage` JSON-LD is printed in `wp_footer`, so FAQ parts must render before the footer.
+**Contact form.** No backend. `main.js` validates the form and checks the honeypot field `website`. If the form has a `data-endpoint` (from `config.formEndpoint`), it posts `FormData` there with `fetch`. Otherwise it opens a prefilled `mailto:` to `config.email`.
 
-**Contact form.** `template-parts/contact-form.php` posts to `admin-post.php` (`action=mursi_contact`), handled in `inc/contact-form.php` (nonce, honeypot field `website`, sanitization, `wp_mail` to the Customizer email). Result is shown through a `?contact=sent|invalid|error` redirect flag.
-
-**Portfolio.** `project` CPT (rewrite slug `work`) + `project_type` taxonomy, with `_mursi_client` / `_mursi_url` meta boxes. Cards are `template-parts/project-card.php`, whose `data-types` attribute drives the JS filter.
-
-**Front end.** All styles are in `style.css` (design tokens as CSS variables at the top). `assets/js/main.js` is dependency-free vanilla JS: sticky header, mobile menu, FAQ accordion, pricing tabs, portfolio filter, scroll reveal. The `<html>` starts with `no-js`, swapped to `js` in `wp_head`, so `.reveal` content stays visible without JS.
+**Front end.** All styles are in `static-site/assets/css/style.css` (design tokens as CSS variables at the top). `static-site/assets/js/main.js` is dependency-free vanilla JS: sticky header, mobile menu, FAQ accordion, pricing tabs, portfolio filter, contact form, scroll reveal. `<html>` starts with `no-js`, swapped to `js` by an inline script in `<head>`, so `.reveal` content stays visible without JS.
 
 ## Conventions
 
-- Prefix all functions, globals in templates, and option keys with `mursi_`; text domain is `mursi-digital`.
-- Follow WordPress coding standards: escape all output (`esc_html`, `esc_url`, `esc_attr`), wrap user-facing strings in `__()` / `esc_html_e()`, sanitize all input.
-- Icons are inline SVGs from `mursi_icon()` / `mursi_the_icon()` in `inc/helpers.php`; add new icons there rather than adding image files or icon fonts.
+- Escape every interpolated value in `build.js` templates with `esc()`. Icon SVGs from `icon()` are trusted and inserted raw.
+- Icons are inline SVGs in `ICONS` / `BRAND_ICONS` in `build.js`; add new icons there rather than adding image files or icon fonts.
+- Keep `main.js` ES5-style (`var`, `function`), matching the existing code.
 - Testimonials, prices and About-page stats are placeholders and must not be presented as real data.
