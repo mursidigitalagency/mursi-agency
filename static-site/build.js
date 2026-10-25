@@ -212,7 +212,7 @@ ${wa ? `\n<a class="wa-float" href="${esc(wa)}" target="_blank" rel="noopener" a
 
 /**
  * Full HTML document. FAQs collected while rendering the body are printed as
- * one FAQPage schema block, like the theme's mursi_faq_registry().
+ * one FAQPage schema block.
  */
 function layout({ slug, title, description, body, schema = [], faqs = [] }) {
 	const blocks = schema.slice();
@@ -260,7 +260,7 @@ ${footer()}
 }
 
 /* --------------------------------------------------------------------------
-   Sections (port of template-parts/*)
+   Sections
    -------------------------------------------------------------------------- */
 
 function pageHero({ eyebrow = '', title, text = '', buttons = true }) {
